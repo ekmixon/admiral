@@ -28,7 +28,7 @@ def save_source_in_file(closure_description, module_name):
             os.makedirs(SRC_DIR)
         src_file = open(SRC_DIR + os.sep + module_name + '.py', "w")
     except Exception as err:
-        sys.stderr.write('ERROR: Unable to save source file %sn' % str(err))
+        sys.stderr.write(f'ERROR: Unable to save source file {str(err)}n')
         raise err
     else:
         # print 'Saving python script: {}'.format(closure_description['source'])
@@ -39,13 +39,12 @@ def save_source_in_file(closure_description, module_name):
 
 def save_dependencies(closure_description):
     if 'dependencies' in closure_description:
-        dependencies = closure_description['dependencies']
-        if dependencies:
-            print ('Saving dependencies: %s' % str(dependencies))
+        if dependencies := closure_description['dependencies']:
+            print(f'Saving dependencies: {str(dependencies)}')
             try:
                 src_file = open(SRC_DIR + os.sep + SRC_REQ_FILE, "w")
             except Exception as err:
-                sys.stderr.write('ERROR: Unable to save dependency file %s' % str(err))
+                sys.stderr.write(f'ERROR: Unable to save dependency file {str(err)}')
                 raise err
             else:
                 src_file.write(dependencies)
@@ -60,9 +59,12 @@ def install_dependencies():
             subprocess.run(['pip3', 'install', '--upgrade', '-r', requirements_path],
                            check=True, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
-            print ('Unable to install dependencies: %s' % str(e.stderr))
-            sys.stderr.write('ERROR: Unable to install dependencies. Reason: %s' % str(e.stderr))
-            raise Exception('Unable to install dependencies. Reason: %s' % str(e.stderr))
+            print(f'Unable to install dependencies: {str(e.stderr)}')
+            sys.stderr.write(
+                f'ERROR: Unable to install dependencies. Reason: {str(e.stderr)}'
+            )
+
+            raise Exception(f'Unable to install dependencies. Reason: {str(e.stderr)}')
         print ('Dependencies installed.')
     print ('No dependencies found.')
 
@@ -82,7 +84,7 @@ def patch_results(outputs, closure_semaphore, token):
     }
     patch_resp = dynamic_wrapper('patch', closure_uri, headers, json.dumps(data))
     if patch_resp.ok:
-        print ('Script run state: ' + state)
+        print(f'Script run state: {state}')
     else:
         patch_resp.raise_for_status()
 
@@ -152,7 +154,6 @@ def execute_saved_source(closure_uri, inputs, closure_semaphore, module_name, ha
 
 
 def download_and_save_source(source_url, module_name, closure_description, skip_execution):
-    chunk_size = 10 * 1024
     if not os.path.exists(SRC_DIR):
         os.makedirs(SRC_DIR)
     # print 'Downloading source from: ', source_url
@@ -166,7 +167,8 @@ def download_and_save_source(source_url, module_name, closure_description, skip_
         sip_content = zipfile.ZipFile(io.BytesIO(resp.content))
         sip_content.extractall(SRC_DIR)
     else:
-        with open(os.path.join(SRC_DIR, module_name) + '.py', 'wb') as file_dest:
+        chunk_size = 10 * 1024
+        with open(f'{os.path.join(SRC_DIR, module_name)}.py', 'wb') as file_dest:
             for chunk in resp.iter_content(chunk_size):
                 file_dest.write(chunk)
         if skip_execution:
@@ -176,14 +178,16 @@ def download_and_save_source(source_url, module_name, closure_description, skip_
 def create_entry_point(closure_description):
     handler_name = closure_description['name']
     if 'entrypoint' in closure_description:
-        entry_point = closure_description['entrypoint']
-        if entry_point:
+        if entry_point := closure_description['entrypoint']:
             entries = entry_point.rsplit('.', 1)
             return entries[0], entries[1]
         else:
             return 'index', handler_name
     else:
-        print ('Entrypoint is empty. Will use closure name for a handler name: ' + handler_name)
+        print(
+            f'Entrypoint is empty. Will use closure name for a handler name: {handler_name}'
+        )
+
         return 'index', handler_name
 
 
@@ -197,19 +201,14 @@ def proceed_with_closure_description(closure_uri, closure_desc_uri, inputs, clos
     if closure_desc_response.ok:
         closure_description = json.loads(closure_desc_response.content.decode('utf-8'))
         (module_name, handler_name) = create_entry_point(closure_description)
-        if 'sourceURL' in closure_description:
-            source_url = closure_description['sourceURL']
-            if source_url:
-                download_and_save_source(source_url, module_name, closure_description, skip_execution)
-            else:
-                save_source_in_file(closure_description, module_name)
-                if skip_execution:
-                    save_dependencies(closure_description)
+        if 'sourceURL' in closure_description and (
+            source_url := closure_description['sourceURL']
+        ):
+            download_and_save_source(source_url, module_name, closure_description, skip_execution)
         else:
             save_source_in_file(closure_description, module_name)
             if skip_execution:
                 save_dependencies(closure_description)
-
         if skip_execution:
             install_dependencies()
         else:
@@ -296,10 +295,7 @@ def proceed_with_closure_execution(skip_execution=False):
             setup_exc_handler(closure_semaphore)
             patch_closure_started(closure_uri, closure_semaphore)
 
-        if 'inputs' in closure_data:
-            closure_inputs = closure_data['inputs']
-        else:
-            closure_inputs = {}
+        closure_inputs = closure_data['inputs'] if 'inputs' in closure_data else {}
         closure_desc_link = closure_data['descriptionLink']
         closure_desc_uri = build_closure_description_uri(closure_uri, closure_desc_link)
         proceed_with_closure_description(closure_uri, closure_desc_uri, closure_inputs, closure_semaphore, skip_execution)
@@ -329,7 +325,7 @@ def patch_failure(closure_semaphore, error, token=None):
 
     patch_resp = dynamic_wrapper('patch', closure_uri, headers, json.dumps(data))
     if patch_resp.ok:
-        print ('Script run state: ' + state)
+        print(f'Script run state: {state}')
     else:
         patch_resp.raise_for_status()
 
